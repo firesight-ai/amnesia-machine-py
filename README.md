@@ -2,6 +2,8 @@
 
 A robust implementation of the Hypothetical Amnesia Machine (HAM) algorithm with Vector Clocks for advanced conflict resolution in distributed systems.
 
+*see [amnesia-machine-py](https://github.com/firesight-ai/amnesia-machine-js) for the Javascript port.*
+
 ## Introduction
 
 amnesia-machine is an advanced implementation of the Hypothetical Amnesia Machine (HAM) algorithm, designed to provide robust conflict resolution for distributed systems. It extends the original HAM concept by incorporating Vector Clocks, offering more precise handling of concurrent updates in a distributed environment.
