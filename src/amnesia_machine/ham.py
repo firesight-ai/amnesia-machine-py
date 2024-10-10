@@ -1,47 +1,49 @@
+from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
 from .errors import HAMError
-from .vector_clock import VectorClock, validate_type, validate_vector_clock
-from .state import State
+from .vector_clock import VectorClock
+from .state import State, NodeModel
 
-class HAM:
-    def __init__(self, node_id: str):
-        self.node_id = node_id
-        self.debug_mode = False
+class HAMResult(BaseModel):
+    defer: Optional[bool] = None
+    historical: Optional[bool] = None
+    converge: Optional[bool] = None
+    incoming: Optional[bool] = None
+    state: Optional[bool] = None
+    current: Optional[bool] = None
+    err: Optional[HAMError] = None
+
+class HAM(BaseModel):
+    node_id: str
+    debug_mode: bool = Field(default=False)
 
     def ham(self, machine_state: VectorClock, incoming_state: VectorClock, current_state: VectorClock, 
-            incoming_value: Any, current_value: Any) -> Dict[str, Any]:
-        validate_vector_clock(machine_state)
-        validate_vector_clock(incoming_state)
-        validate_vector_clock(current_state)
-
+            incoming_value: Any, current_value: Any) -> HAMResult:
         comparison = incoming_state.compare(current_state)
 
         if machine_state.compare(incoming_state) == 1:
-            return {"defer": True}
+            return HAMResult(defer=True)
         if comparison == -1:
-            return {"historical": True}
+            return HAMResult(historical=True)
         if comparison == 1:
-            return {"converge": True, "incoming": True}
+            return HAMResult(converge=True, incoming=True)
         if comparison == 0:
             incoming_value = self.unwrap(incoming_value)
             current_value = self.unwrap(current_value)
             if incoming_value == current_value:
-                return {"state": True}
+                return HAMResult(state=True)
             if str(incoming_value) < str(current_value):
-                return {"converge": True, "current": True}
+                return HAMResult(converge=True, current=True)
             if str(current_value) < str(incoming_value):
-                return {"converge": True, "incoming": True}
-        return {"err": HAMError(f"Concurrent updates detected: {incoming_value} and {current_value}")}
+                return HAMResult(converge=True, incoming=True)
+        return HAMResult(err=HAMError(f"Concurrent updates detected: {incoming_value} and {current_value}"))
 
     def unwrap(self, val: Any) -> Any:
         if isinstance(val, dict) and '#' in val and '.' in val and '>' in val:
             return val.get(':')
         return val
 
-    def union(self, vertex: Dict[str, Any], node: Dict[str, Any]) -> Dict[str, Any]:
-        validate_type(vertex, dict)
-        validate_type(node, dict)
-
+    def union(self, vertex: NodeModel, node: NodeModel) -> NodeModel:
         if not vertex:
             return node
         if not node:
@@ -49,28 +51,28 @@ class HAM:
 
         machine_state = self.machine_state()
 
-        if node.get('_', {}).get('#'):
-            vertex.setdefault('_', {})['#'] = node['_']['#']
+        if node._.get('#'):
+            vertex._.setdefault('#', node._['#'])
 
-        for key, value in node.items():
+        for key, value in node.dict().items():
             if key == '_':
                 continue
 
             incoming_state = State.get_state(node, key)
             current_state = State.get_state(vertex, key)
-            incoming_value = node[key]
-            current_value = vertex.get(key)
+            incoming_value = value
+            current_value = getattr(vertex, key, None)
 
             result = self.ham(machine_state, incoming_state, current_state, incoming_value, current_value)
 
-            if 'err' in result:
-                self.log('error', str(result['err']))
+            if result.err:
+                self.log('error', str(result.err))
                 continue
 
-            if result.get('state') or result.get('historical') or result.get('current'):
+            if result.state or result.historical or result.current:
                 continue
 
-            if result.get('defer') or result.get('incoming'):
+            if result.defer or result.incoming:
                 State.ify(vertex, key, incoming_state, incoming_value)
 
         return vertex
@@ -80,22 +82,13 @@ class HAM:
         state.increment(self.node_id)
         return state
 
-    def graph(self, graph: Dict[str, Any], soul: str, key: str, val: Any, state: VectorClock) -> Dict[str, Any]:
-        validate_type(graph, dict)
-        validate_type(soul, str)
-        validate_type(key, str)
-        validate_vector_clock(state)
-        graph[soul] = State.ify(graph.get(soul, {}), key, state, val, soul)
+    def graph(self, graph: Dict[str, NodeModel], soul: str, key: str, val: Any, state: VectorClock) -> Dict[str, NodeModel]:
+        graph[soul] = State.ify(graph.get(soul, NodeModel(_={})), key, state, val, soul)
         return graph
 
-    def graph_operation(self, graph: Dict[str, Any], soul: str, key: str, val: Any, state: VectorClock) -> Dict[str, Any]:
-        validate_type(graph, dict)
-        validate_type(soul, str)
-        validate_type(key, str)
-        validate_vector_clock(state)
-
+    def graph_operation(self, graph: Dict[str, NodeModel], soul: str, key: str, val: Any, state: VectorClock) -> Dict[str, NodeModel]:
         if soul not in graph:
-            graph[soul] = {'_': {'#': soul, '>': {}}}
+            graph[soul] = NodeModel(_={'#': soul, '>': {}})
 
         return self.graph(graph, soul, key, val, state)
 
@@ -103,13 +96,7 @@ class HAM:
         if self.debug_mode:
             print(f"[HAM {level.upper()}] {message}")
 
-    def set_debug_mode(self, mode: bool) -> None:
-        self.debug_mode = mode
-
-    def merge_graphs(self, local_graph: Dict[str, Any], incoming_graph: Dict[str, Any]) -> Dict[str, Any]:
-        validate_type(local_graph, dict)
-        validate_type(incoming_graph, dict)
-
+    def merge_graphs(self, local_graph: Dict[str, NodeModel], incoming_graph: Dict[str, NodeModel]) -> Dict[str, NodeModel]:
         merged_graph = local_graph.copy()
 
         for soul, node in incoming_graph.items():

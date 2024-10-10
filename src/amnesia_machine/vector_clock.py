@@ -1,9 +1,8 @@
-from typing import Dict, Optional, Set, Union, Any, Tuple
-from .errors import HAMError
+from pydantic import BaseModel, Field
+from typing import Dict, Optional, Set
 
-class VectorClock:
-    def __init__(self, clock: Dict[str, int] = None):
-        self.clock: Dict[str, int] = clock or {}
+class VectorClock(BaseModel):
+    clock: Dict[str, int] = Field(default_factory=dict)
 
     def increment(self, node_id: str) -> None:
         self.clock[node_id] = self.clock.get(node_id, 0) + 1
@@ -36,24 +35,10 @@ class VectorClock:
             return 0  # equal
         return None  # concurrent
 
-    def __str__(self) -> str:
-        return str(self.clock)
-
-    def __repr__(self) -> str:
-        return f"VectorClock({self.clock})"
-
     @staticmethod
     def gun_state_to_vector_clock(gun_state: Dict[str, int]) -> 'VectorClock':
-        return VectorClock(gun_state)
+        return VectorClock(clock=gun_state)
 
     @staticmethod
     def vector_clock_to_gun_state(vector_clock: 'VectorClock') -> Dict[str, int]:
         return vector_clock.clock
-
-def validate_type(value: Any, expected_type: Union[type, Tuple[type, ...]]) -> None:
-    if not isinstance(value, expected_type):
-        raise HAMError(f"Expected {expected_type}, got {type(value)}")
-
-def validate_vector_clock(value: Any) -> None:
-    if not isinstance(value, VectorClock):
-        raise HAMError(f"Expected VectorClock, got {type(value)}")

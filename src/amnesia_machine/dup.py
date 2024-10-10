@@ -1,27 +1,28 @@
 import time
+from pydantic import BaseModel, Field
 from typing import Dict, Optional
-from .errors import HAMError
-from .vector_clock import VectorClock, validate_type
+from .vector_clock import VectorClock
 
-class Dup:
-    def __init__(self, options: Dict[str, int] = None):
-        self.s: Dict[str, Dict[str, any]] = {}
-        self.ttl: int = (options or {}).get('ttl', 300000)  # 5 minutes default
+class DupData(BaseModel):
+    ts: int
+    clock: VectorClock
 
-    def track(self, id: str) -> Optional[Dict[str, any]]:
-        validate_type(id, str)
+class Dup(BaseModel):
+    s: Dict[str, DupData] = Field(default_factory=dict)
+    ttl: int = Field(default=300000)  # 5 minutes default
+
+    def track(self, id: str) -> Optional[DupData]:
         if not id:
             return None
         if id not in self.s:
-            self.s[id] = {'ts': int(time.time() * 1000), 'clock': VectorClock()}
+            self.s[id] = DupData(ts=int(time.time() * 1000), clock=VectorClock())
         return self.s[id]
 
-    def check(self, id: str) -> Optional[Dict[str, any]]:
-        validate_type(id, str)
+    def check(self, id: str) -> Optional[DupData]:
         if not id:
             return None
         return self.s.get(id)
 
     def free(self) -> None:
         now = int(time.time() * 1000)
-        self.s = {id: data for id, data in self.s.items() if data['ts'] and (now - data['ts']) <= self.ttl}
+        self.s = {id: data for id, data in self.s.items() if data.ts and (now - data.ts) <= self.ttl}
