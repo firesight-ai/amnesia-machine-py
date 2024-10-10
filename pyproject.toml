@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "amnesia-machine"
+version = "0.1.4"
+description = "Implementation of the Hypothetical Amnesia Machine (HAM)"
+authors = ["bitnom <14287229+bitnom@users.noreply.github.com>"]
+license = "Apache 2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
