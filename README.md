@@ -2,7 +2,7 @@
 
 A robust implementation of the Hypothetical Amnesia Machine (HAM) algorithm with Vector Clocks for advanced conflict resolution in distributed systems.
 
-*see [amnesia-machine-py](https://github.com/firesight-ai/amnesia-machine-js) for the Javascript port.*
+*see [amnesia-machine-js](https://github.com/firesight-ai/amnesia-machine-js) for the Javascript port.*
 
 ## Introduction
 
