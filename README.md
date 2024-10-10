@@ -21,7 +21,7 @@ This library is particularly useful for developers working with decentralized ap
 ## Installation
 
 ```bash
-pip install amnesia-machine
+poetry add amnesia-machine
 ```
 
 ## Usage
